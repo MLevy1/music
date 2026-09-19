@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
-import {ROOT,clip,edit,move,validate,copyCell,pasteCell,fillRegion,eraseRegion,cellFromCoordinates,hasDetailedOccupancy,validatePatterns} from "./space.mjs";
+import {ROOT,clip,edit,move,validate,copyCell,pasteCell,fillRegion,eraseRegion,recolorRegion,cellFromCoordinates,adjacentCell,hasDetailedOccupancy,validatePatterns} from "./space.mjs";
 const $=s=>document.querySelector(s);
 const colors=["#ff5349","#ff7a2f","#f5a623","#f5d547","#a8db4b","#48b85b","#1ba784","#16a6a1","#35bce3","#4a9df1","#4263d8","#5c52c9","#8756d9","#ae54cf","#dd4eab","#f06292","#9f304d","#a74435","#82563a","#c79b63","#ead9a5","#91d4b1","#b5e2e8","#b8ccec","#c3b5e7","#f1f2ed","#b7bdc7","#7f8793","#535c68","#343941","#17191e","#c46f44"];
 const KEY="block32-spatial-v2",PATTERN_KEY="block32-patterns-v1";
@@ -21,6 +21,7 @@ function backToParent(){
   selected=path.pop();
   layer=Math.round((selected.min[1]-region().min[1])/step());
   $("#layer").value=layer;
+  mode("select");
   refresh();
   home();
 }
@@ -37,6 +38,10 @@ const picker=document.createElement("div");picker.className="cell-picker";
 picker.innerHTML='<label>X <input id="cell-x" type="number" min="0" max="9" value="0"></label><label>Y <input id="cell-y" type="number" min="0" max="9" value="0"></label><label>Z <input id="cell-z" type="number" min="0" max="9" value="0"></label><button id="pick-cell" class="button">Select coordinates</button>';
 panel.append(picker);
 const safety=document.createElement("label");safety.className="detail-protection";safety.innerHTML='<input id="protect-detail" type="checkbox" checked> Warn before replacing detailed contents';panel.append(safety);
+const adjacent=document.createElement("div");adjacent.className="adjacent-panel";
+adjacent.innerHTML='<div class="adjacent-heading">Select adjacent cell</div><div class="adjacent-actions"><button class="button" data-axis="0" data-delta="-1">X− Left</button><button class="button" data-axis="0" data-delta="1">X+ Right</button><button class="button" data-axis="1" data-delta="-1">Y− Down</button><button class="button" data-axis="1" data-delta="1">Y+ Up</button><button class="button" data-axis="2" data-delta="-1">Z− Back</button><button class="button" data-axis="2" data-delta="1">Z+ Front</button></div>';
+panel.append(adjacent);
+adjacent.querySelectorAll("button").forEach(button=>button.onclick=()=>run(()=>{if(!selected)throw Error("Select a cell first.");selected=adjacentCell(selected,Number(button.dataset.axis),Number(button.dataset.delta),region());layer=Math.round((selected.min[1]-region().min[1])/step());$("#layer").value=layer;mode("select");refresh();}));
 $("#pick-cell").onclick=()=>run(()=>{const xyz=["#cell-x","#cell-y","#cell-z"].map(s=>Number($(s).value));if(xyz.some(n=>!Number.isInteger(n)||n<0||n>9))throw Error("Choose cell coordinates from 0 to 9.");const min=xyz.map((n,i)=>region().min[i]+n*step());selected={min,max:min.map(n=>n+step())};mode("select");refresh();});
 let clipboard=null;
 const bulk=document.createElement("section");bulk.className="panel-section bulk-panel";
@@ -133,6 +138,7 @@ $("#selected-color-name").textContent=color;
 const customColor=document.createElement("div");customColor.className="custom-color";
 customColor.innerHTML='<label for="custom-color-picker">Custom color</label><input id="custom-color-picker" type="color" value="#ff5349" aria-label="Choose custom color"><input id="custom-color-hex" type="text" value="#ff5349" maxlength="7" spellcheck="false" aria-label="Custom color hex value">';
 $("#palette").after(customColor);
+const recolorButton=document.createElement("button");recolorButton.id="recolor-cell";recolorButton.className="button recolor-button";recolorButton.textContent="Apply color to selected cell";customColor.after(recolorButton);
 function chooseColor(next,swatch){
  if(!/^#[0-9a-f]{6}$/i.test(next))throw Error("Enter a six-digit color such as #2f80ed.");
  color=next.toLowerCase();$("#selected-color-name").textContent=color;$("#custom-color-picker").value=color;$("#custom-color-hex").value=color;
@@ -140,6 +146,7 @@ function chooseColor(next,swatch){
 }
 $("#custom-color-picker").oninput=e=>chooseColor(e.target.value,null);
 $("#custom-color-hex").onchange=e=>run(()=>chooseColor(e.target.value.trim(),null));
+recolorButton.onclick=()=>run(()=>{if(!selected)throw Error("Select a cell first.");world.boxes=recolorRegion(world.boxes,selected,owner,color);mode("select");save();say("Selected occupied contents recolored without changing their shape.");});
 const modeBadge=document.createElement("div");modeBadge.id="mode-badge";modeBadge.setAttribute("aria-live","polite");$(".viewport-wrap").append(modeBadge);
 const viewShortcuts=document.createElement("div");viewShortcuts.className="view-shortcuts";viewShortcuts.setAttribute("aria-label","Standard views");viewShortcuts.innerHTML='<button type="button" data-view="front">Front</button><button type="button" data-view="back">Back</button><button type="button" data-view="left">Left</button><button type="button" data-view="right">Right</button><button type="button" data-view="top">Top</button><button type="button" data-view="bottom">Bottom</button>';$(".viewport-wrap").append(viewShortcuts);
 const scene=new THREE.Scene();scene.background=new THREE.Color("#0d0f13");
@@ -149,7 +156,15 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 const controls=new OrbitControls(camera,$("#viewport"));controls.enableDamping=true;controls.minDistance=2;controls.maxDistance=40;controls.maxPolarAngle=Math.PI;
 scene.add(new THREE.HemisphereLight(0xffffff,0x59616e,2.5));
 const light=new THREE.DirectionalLight(0xffffff,2);light.position.set(4,12,8);scene.add(light);
-const grid=new THREE.GridHelper(10,10,0x8796aa,0x455064);scene.add(grid);
+const grid=new THREE.GridHelper(10,10,0xd6e7ff,0x71849b);grid.material.transparent=true;grid.material.opacity=.78;scene.add(grid);
+const latticePoints=[];
+for(let a=0;a<=10;a++)for(let b=0;b<=10;b++){
+  latticePoints.push(-5,a,b-5,5,a,b-5);
+  latticePoints.push(a-5,0,b-5,a-5,10,b-5);
+  latticePoints.push(a-5,b,-5,a-5,b,5);
+}
+const latticeGeometry=new THREE.BufferGeometry();latticeGeometry.setAttribute("position",new THREE.Float32BufferAttribute(latticePoints,3));
+const lattice=new THREE.LineSegments(latticeGeometry,new THREE.LineBasicMaterial({color:0x7890aa,transparent:true,opacity:.24,depthWrite:false}));lattice.renderOrder=2;scene.add(lattice);
 const floor=new THREE.Mesh(new THREE.PlaneGeometry(10,10),new THREE.MeshBasicMaterial({visible:false,side:THREE.DoubleSide}));floor.rotation.x=-Math.PI/2;scene.add(floor);
 const bounds=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(10,10,10)),new THREE.LineBasicMaterial({color:0x657486,transparent:true,opacity:.35}));bounds.position.y=5;scene.add(bounds);
 const highlight=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)),new THREE.LineBasicMaterial({color:0xffe16a,depthTest:false}));highlight.visible=false;highlight.renderOrder=10;scene.add(highlight);
@@ -188,12 +203,14 @@ function refresh(){
   $("#scale").textContent="Cell: "+length(step())+" · View: "+length(step()*10)+" cube";
   $("#layer-value").textContent=layer+" · "+length(layer*step())+" above view floor";
   $("#crumbs").replaceChildren();
-  for(let d=0;d<=path.length;d++){const b=document.createElement("button");b.className="text-button";b.textContent=d===0?"Room":length(10000/10**d)+" ["+path[d-1].min.join(",")+"]";b.onclick=()=>{path=path.slice(0,d);layer=0;$("#layer").value=0;selected=null;refresh();home();};$("#crumbs").append(b);}
+  for(let d=0;d<=path.length;d++){const b=document.createElement("button");b.className="text-button";b.textContent=d===0?"Room":length(10000/10**d)+" ["+path[d-1].min.join(",")+"]";b.onclick=()=>{path=path.slice(0,d);layer=0;$("#layer").value=0;selected=null;mode("select");refresh();home();};$("#crumbs").append(b);}
   $("#enter").disabled=!selected||step()<=1;
   $("#copy-cell").disabled=!selected;
   $("#paste-cell").disabled=!selected||!clipboard||clipboard.size[0]!==step()||isolated;
   $("#fill-region").disabled=!selected||isolated;
   $("#erase-region").disabled=!selected||isolated;
+  $("#recolor-cell").disabled=!selected;
+  adjacent.querySelectorAll("button").forEach(button=>{try{if(!selected)throw Error();adjacentCell(selected,Number(button.dataset.axis),Number(button.dataset.delta),region());button.disabled=false;}catch{button.disabled=true;}});
   $("#fill-origin").textContent=selected?"Start X / Y / Z: "+selected.min.map(length).join(" / "):"Select a starting cell with Select cell or coordinates.";
   if(clipboard)$("#clipboard-status").textContent="Copied: "+length(clipboard.size[0])+" cell · "+clipboard.parts.length+" occupied regions. Paste into the active object at this scale.";
   if(selected){
@@ -224,12 +241,13 @@ function cellAt(e){
  const min=xyz.map((v,i)=>region().min[i]+v*step());return {min,max:min.map(v=>v+step())};
 }
 const pointers=new Set();
-renderer.domElement.addEventListener("pointerdown",e=>{pointers.add(e.pointerId);if(pointers.size>1)multi=true;down={x:e.clientX,y:e.clientY,id:e.pointerId,moved:false};});
+renderer.domElement.addEventListener("pointerdown",e=>{pointers.add(e.pointerId);if(pointers.size>1){multi=true;mode("select");}down={x:e.clientX,y:e.clientY,id:e.pointerId,moved:false};});
 renderer.domElement.addEventListener("pointermove",e=>{if(down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>5)down.moved=true;});
 renderer.domElement.addEventListener("pointerup",e=>{const click=down&&!down.moved&&!multi&&down.id===e.pointerId&&e.button===0;pointers.delete(e.pointerId);if(!pointers.size)multi=false;down=null;if(!click)return;run(()=>{const cell=cellAt(e);if(!cell)return;selected=cell;if(tool==="select"){refresh();return;}if(tool==="place"&&isolated)throw Error("Turn off the isolated view before placing, so other objects remain visible.");if(tool==="place"&&world.boxes.some(b=>b.owner!==owner&&clip(b,cell)))throw Error("Another object occupies this cell. Enter the cell for finer placement.");if(!confirmDetailedChange(cell,tool==="erase"?"Erase":"Place over")){mode("select");refresh();return;}if(tool==="erase"){world.boxes=world.boxes.flatMap(b=>b.owner===owner?edit([b],cell,null,color):[b]);}else world.boxes=edit(world.boxes,cell,owner,color);save();});});
 renderer.domElement.addEventListener("pointercancel",()=>{pointers.clear();down=null;multi=false;});
+renderer.domElement.addEventListener("wheel",()=>mode("select"),{passive:true});
 $("#select-tool").onclick=()=>mode("select");$("#place-tool").onclick=()=>mode("place");$("#erase-tool").onclick=()=>mode("erase");
-$("#enter").onclick=()=>{if(!selected||step()<=1)return;path.push(selected);selected=null;layer=0;$("#layer").value=0;refresh();home();};
+$("#enter").onclick=()=>{if(!selected||step()<=1)return;path.push(selected);selected=null;layer=0;$("#layer").value=0;mode("select");refresh();home();};
 $("#layer").oninput=e=>{layer=Number(e.target.value);refresh();};
 $("#objects").onchange=e=>{owner=e.target.value;refresh();};
 $("#object-name").onchange=e=>{world.objects.find(o=>o.id===owner).name=e.target.value.trim()||"Untitled object";save();};
@@ -245,7 +263,7 @@ $("#save-button").onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stri
 $("#file-input").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;if(f.size>15000000)return say("Please use a JSON file under 15 MB.");try{const raw=JSON.parse(await f.text()),next=validate(raw),nextPatterns=raw.patterns===undefined?patterns:validatePatterns(raw.patterns);if(world.boxes.length&&!confirm("Replace this room with the imported file? Save JSON first if you need a backup."))return;world=next;patterns=nextPatterns;savePatterns();if(!world.objects.length)world.objects.push({id:"initial",name:"Room structure",kind:"fixed"});owner=world.objects[0].id;path=[];selected=null;layer=0;$("#layer").value=0;save();}catch(err){say(err.message);}};
 $("#clear-button").onclick=()=>{if(confirm("Clear all occupied space in this room?")){world.boxes=[];path=[];selected=null;save();}};
 $("#reset-view").onclick=home;
-for(const [id,factor] of [["#zoom-in",.82],["#zoom-out",1.22]])$(id).onclick=()=>{const v=camera.position.clone().sub(controls.target);v.setLength(THREE.MathUtils.clamp(v.length()*factor,2,40));camera.position.copy(controls.target).add(v);controls.update();};
+for(const [id,factor] of [["#zoom-in",.82],["#zoom-out",1.22]])$(id).onclick=()=>{mode("select");const v=camera.position.clone().sub(controls.target);v.setLength(THREE.MathUtils.clamp(v.length()*factor,2,40));camera.position.copy(controls.target).add(v);controls.update();};
 try{const saved=localStorage.getItem(KEY);if(saved){world=validate(JSON.parse(saved));owner=world.objects[0]?.id||"initial";}else if(localStorage.getItem("block32-world-v1"))say("Your original world is preserved separately. This decimal workspace starts a new room.");}catch{say("Local save could not be opened. It has been left untouched; import a JSON backup.");}
 try{patterns=validatePatterns(JSON.parse(localStorage.getItem(PATTERN_KEY)||"[]"));}catch{patterns=[];say("Saved patterns could not be opened; the room itself is unaffected.");}
 function resize(){const r=$(".viewport-wrap");renderer.setSize(r.clientWidth,r.clientHeight,false);camera.aspect=r.clientWidth/r.clientHeight;camera.updateProjectionMatrix();}

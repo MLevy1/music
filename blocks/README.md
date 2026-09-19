@@ -65,3 +65,7 @@ Built-in patterns create a floor, ceiling, or wall against any of the six cell f
 Exported JSON filenames include the local date and time. Front, Back, Left, Right, Top, and Bottom buttons place the camera on the corresponding axis; the home button restores the perspective view.
 
 The palette includes a native custom color picker and an editable six-digit hex value. Rectangular erase shares the fill tool's selected origin, width, height, depth, and units. It subtracts only from the active object and preserves all other objects.
+
+The viewport now shows a translucent 3D lattice through the full current volume, with a stronger editing-layer grid. After selecting a cell, six adjacent-cell buttons move the selection left, right, down, up, back, or front without editing anything. Buttons at the current view boundary are disabled.
+
+Apply color to selected cell recolors only the active object's occupied contents inside that cell. Detailed geometry and carved empty space remain unchanged. Entering or leaving a nested view, clicking a zoom button, scrolling to zoom, or pinch-zooming automatically returns the editor to Select mode.

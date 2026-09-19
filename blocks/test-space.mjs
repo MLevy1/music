@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {edit,move,validate,clip,ROOT,copyCell,pasteCell,fillRegion,eraseRegion,cellFromCoordinates,hasDetailedOccupancy,validatePatterns} from "./dist/space.mjs";
+import {edit,move,validate,clip,ROOT,copyCell,pasteCell,fillRegion,eraseRegion,recolorRegion,cellFromCoordinates,adjacentCell,hasDetailedOccupancy,validatePatterns} from "./dist/space.mjs";
 const volume=bs=>bs.reduce((s,b)=>s+b.min.reduce((v,n,i)=>v*(b.max[i]-n),1),0);
 const cube={min:[0,0,0],max:[1000,1000,1000]};
 let boxes=edit([],cube,"desk","#ff5349");
@@ -77,3 +77,14 @@ assert.equal(volume(erased.filter(b=>b.owner==="desk")),volume([floorBox])-volum
 assert.deepEqual(erased.filter(b=>b.owner==="wall"),[otherBox]);
 assert.throws(()=>eraseRegion([floorBox],{min:[0,0,0],max:[10001,1,1]},"desk"),/within/);
 console.log("Rectangular erase checks passed: exact subtraction, object isolation and room bounds.");
+const recolored=recolorRegion([floorBox,otherBox],cut,"desk","#ABCDEF");
+assert.equal(volume(recolored.filter(b=>b.owner==="desk")),volume([floorBox]));
+assert(recolored.filter(b=>b.owner==="desk"&&clip(b,cut)).every(b=>b.color==="#abcdef"));
+assert.deepEqual(recolored.filter(b=>b.owner==="wall"),[otherBox]);
+assert.throws(()=>recolorRegion([floorBox],{min:[5000,0,0],max:[6000,1000,1000]},"desk","#abcdef"),/no occupied space/);
+const neighborSource={min:[2000,3000,4000],max:[3000,4000,5000]};
+assert.deepEqual(adjacentCell(neighborSource,0,1,ROOT),{min:[3000,3000,4000],max:[4000,4000,5000]});
+assert.deepEqual(adjacentCell(neighborSource,1,-1,ROOT),{min:[2000,2000,4000],max:[3000,3000,5000]});
+assert.throws(()=>adjacentCell({min:[0,0,0],max:[1000,1000,1000]},0,-1,ROOT),/no cell/);
+assert.throws(()=>adjacentCell(neighborSource,3,1,ROOT),/valid adjacent/);
+console.log("Selection checks passed: recoloring preserves geometry and adjacent movement respects view bounds.");

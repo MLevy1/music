@@ -588,6 +588,11 @@ button:focus-visible {
 .custom-color {display:grid;grid-template-columns:auto 42px minmax(0,1fr);align-items:center;gap:8px;margin-top:14px;font-size:14px;}
 .custom-color input[type="color"] {width:42px;height:36px;padding:2px;border:1px solid var(--border-strong);border-radius:5px;background:var(--panel-raised);cursor:pointer;}
 .custom-color input[type="text"] {width:100%;min-width:0;height:36px;padding:0 8px;border:1px solid var(--border-strong);border-radius:5px;background:var(--panel-raised);color:var(--text);font:inherit;}
+.recolor-button {width:100%;margin-top:9px;background:var(--panel-raised);}
+.adjacent-panel {margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
+.adjacent-heading {margin-bottom:8px;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
+.adjacent-actions {display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.adjacent-actions .button {min-width:0;padding:0 7px;font-size:12px;}
 .rectangle-actions {display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px;}
 .rectangle-erase {border-color:#8d423d;color:#ff9b94;background:#251817;}
 .view-shortcuts {display:grid;grid-template-columns:repeat(3,auto);}

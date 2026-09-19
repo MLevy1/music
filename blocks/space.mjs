@@ -59,6 +59,21 @@ export function eraseRegion(boxes,cell,owner) {
   checkRegion(cell);
   return boxes.flatMap(box=>box.owner===owner?subtract(box,cell):[box]);
 }
+export function recolorRegion(boxes,cell,owner,color) {
+  checkRegion(cell);
+  if(!/^#[0-9a-f]{6}$/i.test(color))throw Error("Choose a valid six-digit color first.");
+  let found=false;
+  const next=[];
+  for(const box of boxes){
+    if(box.owner!==owner||!intersects(box,cell)){next.push(box);continue;}
+    found=true;
+    const inside=clip(box,cell);
+    next.push(...subtract(box,cell),{...inside,color:color.toLowerCase()});
+  }
+  if(!found)throw Error("The active object has no occupied space in this cell.");
+  if(next.length>30000)throw Error("This recolor exceeds the 30,000 region limit.");
+  return next;
+}
 export function copyCell(boxes,cell,owner) {
   checkRegion(cell);
   const parts=boxes.filter(b=>b.owner===owner).map(b=>clip(b,cell)).filter(Boolean).map(b=>({min:b.min.map((v,i)=>v-cell.min[i]),max:b.max.map((v,i)=>v-cell.min[i]),color:b.color}));
@@ -81,6 +96,16 @@ export function cellFromCoordinates(region,xyz) {
   const size=(region.max[0]-region.min[0])/10;
   const min=xyz.map((n,i)=>region.min[i]+n*size);
   const cell={min,max:min.map(n=>n+size)};checkRegion(cell);return cell;
+}
+
+export function adjacentCell(cell,axis,delta,within=ROOT) {
+  checkRegion(cell);checkRegion(within);
+  if(!Number.isInteger(axis)||axis<0||axis>2||![-1,1].includes(delta))throw Error("Choose a valid adjacent direction.");
+  const distance=cell.max[axis]-cell.min[axis];
+  const next={min:[...cell.min],max:[...cell.max]};
+  next.min[axis]+=delta*distance;next.max[axis]+=delta*distance;
+  if(next.min.some((v,i)=>v<within.min[i]||next.max[i]>within.max[i]))throw Error("There is no cell in that direction in this view.");
+  return next;
 }
 
 export function hasDetailedOccupancy(boxes,cell,owner) {
