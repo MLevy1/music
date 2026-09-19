@@ -241,11 +241,10 @@ function cellAt(e){
  const min=xyz.map((v,i)=>region().min[i]+v*step());return {min,max:min.map(v=>v+step())};
 }
 const pointers=new Set();
-renderer.domElement.addEventListener("pointerdown",e=>{pointers.add(e.pointerId);if(pointers.size>1){multi=true;mode("select");}down={x:e.clientX,y:e.clientY,id:e.pointerId,moved:false};});
+renderer.domElement.addEventListener("pointerdown",e=>{pointers.add(e.pointerId);if(pointers.size>1)multi=true;down={x:e.clientX,y:e.clientY,id:e.pointerId,moved:false};});
 renderer.domElement.addEventListener("pointermove",e=>{if(down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>5)down.moved=true;});
 renderer.domElement.addEventListener("pointerup",e=>{const click=down&&!down.moved&&!multi&&down.id===e.pointerId&&e.button===0;pointers.delete(e.pointerId);if(!pointers.size)multi=false;down=null;if(!click)return;run(()=>{const cell=cellAt(e);if(!cell)return;selected=cell;if(tool==="select"){refresh();return;}if(tool==="place"&&isolated)throw Error("Turn off the isolated view before placing, so other objects remain visible.");if(tool==="place"&&world.boxes.some(b=>b.owner!==owner&&clip(b,cell)))throw Error("Another object occupies this cell. Enter the cell for finer placement.");if(!confirmDetailedChange(cell,tool==="erase"?"Erase":"Place over")){mode("select");refresh();return;}if(tool==="erase"){world.boxes=world.boxes.flatMap(b=>b.owner===owner?edit([b],cell,null,color):[b]);}else world.boxes=edit(world.boxes,cell,owner,color);save();});});
 renderer.domElement.addEventListener("pointercancel",()=>{pointers.clear();down=null;multi=false;});
-renderer.domElement.addEventListener("wheel",()=>mode("select"),{passive:true});
 $("#select-tool").onclick=()=>mode("select");$("#place-tool").onclick=()=>mode("place");$("#erase-tool").onclick=()=>mode("erase");
 $("#enter").onclick=()=>{if(!selected||step()<=1)return;path.push(selected);selected=null;layer=0;$("#layer").value=0;mode("select");refresh();home();};
 $("#layer").oninput=e=>{layer=Number(e.target.value);refresh();};
@@ -263,7 +262,7 @@ $("#save-button").onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stri
 $("#file-input").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;if(f.size>15000000)return say("Please use a JSON file under 15 MB.");try{const raw=JSON.parse(await f.text()),next=validate(raw),nextPatterns=raw.patterns===undefined?patterns:validatePatterns(raw.patterns);if(world.boxes.length&&!confirm("Replace this room with the imported file? Save JSON first if you need a backup."))return;world=next;patterns=nextPatterns;savePatterns();if(!world.objects.length)world.objects.push({id:"initial",name:"Room structure",kind:"fixed"});owner=world.objects[0].id;path=[];selected=null;layer=0;$("#layer").value=0;save();}catch(err){say(err.message);}};
 $("#clear-button").onclick=()=>{if(confirm("Clear all occupied space in this room?")){world.boxes=[];path=[];selected=null;save();}};
 $("#reset-view").onclick=home;
-for(const [id,factor] of [["#zoom-in",.82],["#zoom-out",1.22]])$(id).onclick=()=>{mode("select");const v=camera.position.clone().sub(controls.target);v.setLength(THREE.MathUtils.clamp(v.length()*factor,2,40));camera.position.copy(controls.target).add(v);controls.update();};
+for(const [id,factor] of [["#zoom-in",.82],["#zoom-out",1.22]])$(id).onclick=()=>{const v=camera.position.clone().sub(controls.target);v.setLength(THREE.MathUtils.clamp(v.length()*factor,2,40));camera.position.copy(controls.target).add(v);controls.update();};
 try{const saved=localStorage.getItem(KEY);if(saved){world=validate(JSON.parse(saved));owner=world.objects[0]?.id||"initial";}else if(localStorage.getItem("block32-world-v1"))say("Your original world is preserved separately. This decimal workspace starts a new room.");}catch{say("Local save could not be opened. It has been left untouched; import a JSON backup.");}
 try{patterns=validatePatterns(JSON.parse(localStorage.getItem(PATTERN_KEY)||"[]"));}catch{patterns=[];say("Saved patterns could not be opened; the room itself is unaffected.");}
 function resize(){const r=$(".viewport-wrap");renderer.setSize(r.clientWidth,r.clientHeight,false);camera.aspect=r.clientWidth/r.clientHeight;camera.updateProjectionMatrix();}

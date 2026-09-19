@@ -83,10 +83,12 @@ export function copyCell(boxes,cell,owner) {
 export function pasteCell(boxes,cell,owner,copied) {
   checkRegion(cell);
   if(!copied||copied.size.some((v,i)=>v!==cell.max[i]-cell.min[i]))throw Error("Select a destination cell at the copied scale.");
-  // Preserve empty space too: destination must not contain another object.
-  if(boxes.some(b=>b.owner!==owner&&intersects(b,cell)))throw Error("Paste blocked by another object in the destination cell.");
-  const next=boxes.flatMap(b=>subtract(b,cell));
-  next.push(...copied.parts.map(b=>({...b,owner,min:b.min.map((v,i)=>v+cell.min[i]),max:b.max.map((v,i)=>v+cell.min[i])})));
+  const placed=copied.parts.map(b=>({...b,owner,min:b.min.map((v,i)=>v+cell.min[i]),max:b.max.map((v,i)=>v+cell.min[i])}));
+  // Different objects may share a coarse cell (for example, furniture above a
+  // thin floor). Only their actual occupied geometry is collision-relevant.
+  if(placed.some(part=>boxes.some(b=>b.owner!==owner&&intersects(b,part))))throw Error("Paste blocked where another object overlaps the copied contents.");
+  const next=boxes.flatMap(b=>b.owner===owner?subtract(b,cell):[b]);
+  next.push(...placed);
   if(next.length>30000)throw Error("This paste exceeds the 30,000 region limit.");
   return next;
 }
