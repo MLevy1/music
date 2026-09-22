@@ -575,6 +575,9 @@ button:focus-visible {
 .pattern-panel label {display:block;margin:12px 0;}
 .pattern-panel select {display:block;width:100%;margin-top:5px;padding:8px;color:var(--text);background:var(--panel-raised);border:1px solid var(--border-strong);border-radius:5px;}
 .pattern-actions {display:grid;gap:6px;}
+.pattern-thickness {display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0;}
+.pattern-thickness label {margin:0;font-size:13px;color:var(--muted);}
+.pattern-thickness input,.pattern-thickness select {margin-top:5px;}
 .pattern-actions .text-button {justify-self:start;}
 #mode-badge {position:absolute;z-index:4;top:16px;left:16px;padding:7px 10px;border:1px solid var(--border-strong);border-radius:5px;background:rgba(17,19,24,.9);font-size:13px;font-weight:800;letter-spacing:.08em;pointer-events:none;}
 #mode-badge[data-mode="place"] {color:#ffd166;border-color:#9a7725;}
@@ -680,6 +683,19 @@ body[data-workspace="edit"] .arrange-only {
   margin-top: 12px;
   border-color: #4b6985;
   background: #182431;
+}
+
+.collision-lock {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 0 4px !important;
+  color: var(--text);
+}
+
+.collision-lock input {
+  width: auto !important;
+  margin-top: 3px;
 }
 
 .placement-status {

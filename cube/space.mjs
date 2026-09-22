@@ -94,24 +94,24 @@ export function placementStatus(world,id,transform=world.objects.find(o=>o.id===
   return {valid:true,reason:"Clear"};
 }
 
-export function setTransform(world,id,transform,{allowInvalid=false}={}){
+export function setTransform(world,id,transform,{allowInvalid=false,allowCollision=false}={}){
   const object=world.objects.find(o=>o.id===id);if(!object)throw Error("Object not found.");
   const next={position:transform.position.map(Math.round),rotation:transform.rotation.map(v=>((Math.round(v/90)*90)%360+360)%360)};
   if(next.position.some(v=>!Number.isFinite(v))||next.rotation.some(v=>!Number.isFinite(v)))throw Error("Use valid positions and rotations.");
   const status=placementStatus(world,id,next);
-  if(!allowInvalid&&!status.valid)throw Error(status.reason==="Collision"?"Movement blocked by another object.":"The object would leave the room.");
+  if(!allowInvalid&&!status.valid&&!(allowCollision&&status.reason==="Collision"))throw Error(status.reason==="Collision"?"Movement blocked by another object.":"The object would leave the room.");
   object.transform=next;return status;
 }
 
-export function moveObject(world,id,delta){
+export function moveObject(world,id,delta,options){
   const object=world.objects.find(o=>o.id===id);if(object?.kind!=="movable")throw Error("Fixed objects cannot move. Change the type first.");
-  return setTransform(world,id,{position:object.transform.position.map((v,i)=>v+delta[i]),rotation:[...object.transform.rotation]});
+  return setTransform(world,id,{position:object.transform.position.map((v,i)=>v+delta[i]),rotation:[...object.transform.rotation]},options);
 }
 
-export function rotateObject(world,id,axis,degrees){
+export function rotateObject(world,id,axis,degrees,options){
   const object=world.objects.find(o=>o.id===id);if(object?.kind!=="movable")throw Error("Fixed objects cannot rotate. Change the type first.");
   const rotation=[...object.transform.rotation];rotation[axis]+=degrees;
-  return setTransform(world,id,{position:[...object.transform.position],rotation});
+  return setTransform(world,id,{position:[...object.transform.position],rotation},options);
 }
 
 export function dropObject(world,id){
@@ -130,6 +130,46 @@ export function dropObject(world,id){
 export function objectBounds(object,space="local"){
   const boxes=space==="world"?worldBoxes(object):object.boxes;if(!boxes.length)return null;
   return {min:[0,1,2].map(i=>Math.min(...boxes.map(b=>b.min[i]))),max:[0,1,2].map(i=>Math.max(...boxes.map(b=>b.max[i])))};
+}
+
+export function normalizeObject(world,id){
+  const object=world.objects.find(o=>o.id===id);if(!object?.boxes.length)return [0,0,0];
+  const origin=[0,1,2].map(i=>Math.min(...object.boxes.map(b=>b.min[i])));
+  if(origin.every(v=>v===0))return origin;
+  const worldShift=rotatePoint(origin,object.transform.rotation);
+  object.boxes=object.boxes.map(b=>({...b,min:b.min.map((v,i)=>v-origin[i]),max:b.max.map((v,i)=>v-origin[i])}));
+  object.transform.position=object.transform.position.map((v,i)=>v+worldShift[i]);
+  return origin;
+}
+
+const FACE_SPECS={
+  left:[0,0],right:[0,1],
+  bottom:[1,0],top:[1,1],
+  back:[2,0],front:[2,1]
+};
+
+export function makeFacePattern(size,faces,thickness,color){
+  if(!Number.isInteger(size)||size<1||size>10000||!Number.isInteger(thickness)||thickness<1||thickness>size||!Array.isArray(faces)||!faces.length||faces.some(face=>!FACE_SPECS[face])||!/^#[0-9a-f]{6}$/i.test(color))throw Error("Invalid built-in pattern.");
+  let parts=[];
+  for(const face of faces){
+    const [axis,side]=FACE_SPECS[face],min=[0,0,0],max=[size,size,size];
+    if(side===0)max[axis]=thickness;else min[axis]=size-thickness;
+    parts=edit(parts,{min,max},color);
+  }
+  return {size:[size,size,size],parts};
+}
+
+export function scaleCopiedPattern(copied,targetSize){
+  if(!copied||!Array.isArray(copied.size)||copied.size.length!==3||!Number.isInteger(targetSize)||targetSize<1||targetSize>10000)throw Error("Invalid saved pattern.");
+  let parts=[];
+  for(const part of copied.parts||[]){
+    const min=part.min.map((v,i)=>Math.round(v*targetSize/copied.size[i]));
+    const max=part.max.map((v,i)=>Math.round(v*targetSize/copied.size[i]));
+    if(min.some((v,i)=>v>=max[i]))continue;
+    parts=edit(parts,{min,max},part.color);
+  }
+  if(!parts.length)throw Error("This pattern is too thin to scale to the selected cell.");
+  return {size:[targetSize,targetSize,targetSize],parts};
 }
 
 export function migrateV2(data){
