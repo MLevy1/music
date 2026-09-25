@@ -63,6 +63,23 @@ export function pasteCell(boxes,cell,copied){
   return next;
 }
 
+export function addPatternToCell(boxes,cell,copied){
+  checkRegion(cell);
+  if(!copied||!Array.isArray(copied.size)||copied.size.some((v,i)=>v!==cell.max[i]-cell.min[i]))throw Error("Select a destination cell at the pattern's scale.");
+  const additions=[];
+  for(const part of copied.parts){
+    const placed={min:part.min.map((v,i)=>v+cell.min[i]),max:part.max.map((v,i)=>v+cell.min[i]),color:part.color};
+    checkRegion(placed);
+    if(placed.min.some((v,i)=>v<cell.min[i]||placed.max[i]>cell.max[i]))throw Error("Pattern extends outside the selected cell.");
+    let empty=[placed];
+    for(const occupied of boxes){empty=empty.flatMap(piece=>subtract(piece,occupied));if(!empty.length)break;}
+    for(const occupied of additions){empty=empty.flatMap(piece=>subtract(piece,occupied));if(!empty.length)break;}
+    additions.push(...empty);
+    if(boxes.length+additions.length>30000)throw Error("This pattern exceeds the 30,000 region limit.");
+  }
+  return additions.length?[...boxes,...additions]:boxes;
+}
+
 const rotatePoint=(point,rotation)=>{
   let [x,y,z]=point;const turns=rotation.map(v=>((Math.round(v/90)%4)+4)%4);
   for(let n=0;n<turns[0];n++)[y,z]=[-z,y];
