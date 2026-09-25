@@ -80,6 +80,26 @@ export function addPatternToCell(boxes,cell,copied){
   return additions.length?[...boxes,...additions]:boxes;
 }
 
+export function carveCellToPattern(boxes,cell,copied){
+  checkRegion(cell);
+  if(!copied||!Array.isArray(copied.size)||copied.size.some((v,i)=>v!==cell.max[i]-cell.min[i]))throw Error("Select a destination cell at the pattern's scale.");
+  const occupied=boxes.map(box=>clip(box,cell)).filter(Boolean);
+  if(!occupied.length)return pasteCell(boxes,cell,copied);
+  const outside=boxes.flatMap(box=>subtract(box,cell)),inside=[];
+  for(const box of occupied)for(const part of copied.parts){
+    const patternBox={min:part.min.map((v,i)=>v+cell.min[i]),max:part.max.map((v,i)=>v+cell.min[i])};
+    checkRegion(patternBox);
+    if(patternBox.min.some((v,i)=>v<cell.min[i]||patternBox.max[i]>cell.max[i]))throw Error("Pattern extends outside the selected cell.");
+    const kept=clip(box,patternBox);
+    if(kept)inside.push(kept); // clip retains the existing box's color.
+  }
+  if(!inside.length)throw Error("No existing material intersects this pattern in the selected cell.");
+  if(outside.length+inside.length>30000)throw Error("This pattern exceeds the 30,000 region limit.");
+  const volume=parts=>parts.reduce((sum,b)=>sum+b.min.reduce((v,n,i)=>v*(b.max[i]-n),1),0);
+  if(volume(inside)===volume(occupied))return boxes;
+  return [...outside,...inside];
+}
+
 const rotatePoint=(point,rotation)=>{
   let [x,y,z]=point;const turns=rotation.map(v=>((Math.round(v/90)%4)+4)%4);
   for(let n=0;n<turns[0];n++)[y,z]=[-z,y];
