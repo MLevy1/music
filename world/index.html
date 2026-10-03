@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=yes">
+  <meta name="theme-color" content="#101217">
+  <title>BLOCK/64 · Sparse Studio</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="mark"></span><strong>BLOCK<span>/64</span></strong><em>SPARSE STUDIO</em></div>
+    <div id="header-stats" class="header-stats">0 primitives · 0 B</div>
+    <div class="header-actions">
+      <button id="new-project" class="ghost">New</button>
+      <label class="button ghost" for="load-json">Load JSON</label>
+      <input id="load-json" type="file" accept="application/json,.json" hidden>
+      <button id="save-json" class="accent">Save JSON</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section id="viewport" class="viewport" aria-label="3D modeling viewport">
+      <canvas id="scene-canvas"></canvas>
+      <div class="viewport-hud top-left">
+        <strong id="tool-readout">Select</strong>
+        <span id="scale-readout">10 cm snap</span>
+      </div>
+      <div class="viewport-hud top-right">
+        <button id="home-view" class="hud-button">World</button>
+        <button id="focus-view" class="hud-button" disabled>Focus</button>
+      </div>
+      <div id="fill-note" class="fill-note" hidden>Fill start set · choose opposite corner</div>
+      <div id="status" class="status" role="status">Ready</div>
+      <div class="touch-help">1 finger orbit · 2 fingers pan/zoom · tap to use tool</div>
+      <nav class="toolstrip" aria-label="Modeling tools">
+        <button data-tool="select" class="tool active"><b>↖</b><span>Select</span></button>
+        <button data-tool="block" class="tool"><b>■</b><span>Block</span></button>
+        <button data-tool="surface" class="tool"><b>▱</b><span>Surface</span></button>
+        <button data-tool="fill" class="tool"><b>▦</b><span>Fill</span></button>
+        <button data-tool="paint" class="tool"><b>●</b><span>Paint</span></button>
+        <button data-tool="erase" class="tool danger"><b>−</b><span>Erase</span></button>
+      </nav>
+    </section>
+
+    <aside class="panel">
+      <section class="panel-section">
+        <div class="section-heading"><h2>Scale</h2><span class="pill">sparse</span></div>
+        <div class="field-grid two">
+          <label>World root<select id="world-size"></select></label>
+          <label>Editing snap<select id="snap-size"></select></label>
+        </div>
+        <p class="hint">World size sets addressable space only. Empty space creates no saved geometry.</p>
+      </section>
+
+      <section class="panel-section">
+        <h2>Working plane</h2>
+        <div class="segmented" id="plane-segment">
+          <button data-plane="XY" class="active">Top · XY</button>
+          <button data-plane="XZ">Front · XZ</button>
+          <button data-plane="YZ">Side · YZ</button>
+        </div>
+        <div class="offset-row">
+          <button id="offset-minus" aria-label="Move plane backward one snap">−</button>
+          <label>Offset (mm)<input id="plane-offset" type="number" inputmode="decimal" value="0"></label>
+          <button id="offset-plus" aria-label="Move plane forward one snap">+</button>
+        </div>
+      </section>
+
+      <section class="panel-section fill-settings">
+        <h2>Surface & fill</h2>
+        <div class="field-grid two">
+          <label>Fill creates<select id="fill-kind"><option value="surface">Surface patch</option><option value="solid">One-snap solid</option></select></label>
+          <label>Surface thickness<input id="surface-thickness" type="number" min="1" step="1" inputmode="numeric" value="1"><span class="unit">mm</span></label>
+        </div>
+        <p class="hint">A 500 m facade is stored as one patch, not millions of cells.</p>
+      </section>
+
+      <section class="panel-section">
+        <h2>Context</h2>
+        <div class="field-grid two">
+          <label>While editing<select id="context-mode"><option value="scene">Entire scene</option><option value="4">Nearby · 4×</option><option value="16">Nearby · 16×</option><option value="64">Nearby · 64×</option><option value="256">Nearby · 256×</option></select></label>
+          <label>Camera precision<select id="origin-mode"><option value="selection">Recenter on Focus</option><option value="world">World origin</option></select></label>
+        </div>
+        <p class="hint">Focus recenters rendering around the selection so millimeter edits remain precise even kilometers from world origin.</p>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-heading"><h2>64-color palette</h2><span id="color-number" class="pill">38 / 64</span></div>
+        <div id="palette" class="palette" aria-label="Color palette"></div>
+      </section>
+
+      <section class="panel-section" id="selection-section">
+        <div class="section-heading"><h2>Selection</h2><span id="selection-kind" class="pill">none</span></div>
+        <div id="selection-empty" class="empty-state">Tap geometry with Select to inspect it.</div>
+        <div id="selection-controls" hidden>
+          <div class="coords">
+            <label>X mm<input id="sel-x" type="number"></label>
+            <label>Y mm<input id="sel-y" type="number"></label>
+            <label>Z mm<input id="sel-z" type="number"></label>
+          </div>
+          <button id="apply-coords" class="wide ghost">Apply coordinates</button>
+          <div class="selection-actions">
+            <button id="duplicate-selected" class="ghost">Duplicate + snap</button>
+            <button id="delete-selected" class="danger-button">Delete</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <h2>Project</h2>
+        <div class="stats-grid">
+          <div><span>Cells</span><strong id="stat-cells">0</strong></div>
+          <div><span>Regions</span><strong id="stat-boxes">0</strong></div>
+          <div><span>File estimate</span><strong id="stat-bytes">0 B</strong></div>
+          <div><span>Visible</span><strong id="stat-visible">0</strong></div>
+        </div>
+        <div id="storage-warning" class="storage-warning" hidden></div>
+        <p class="hint">Autosaved in IndexedDB on this device. No server or paid hosting is required.</p>
+      </section>
+    </aside>
+  </main>
+
+  <div id="fatal" class="fatal" hidden>
+    <strong>3D workspace could not start.</strong>
+    <span>This app needs WebGL and access to the Three.js CDN. Reload when online.</span>
+  </div>
+
+  <script>
+    window.addEventListener('error', e => {
+      if (String(e.message || '').includes('module') || String(e.message || '').includes('import')) {
+        const f=document.getElementById('fatal'); if(f) f.hidden=false;
+      }
+    });
+    window.addEventListener('unhandledrejection', () => { const f=document.getElementById('fatal'); if(f) f.hidden=false; });
+  </script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
