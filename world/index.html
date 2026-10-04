@@ -33,6 +33,9 @@
       <div class="viewport-hud top-left">
         <strong id="tool-readout">Select</strong>
         <span id="scale-readout">10 cm snap</span>
+        <span id="grid-readout">Grid 16 × 16</span>
+        <span id="world-readout">World ±8 m</span>
+        <span id="selection-size-readout" hidden></span>
       </div>
       <div class="viewport-hud top-right">
         <button id="home-view" class="hud-button">World</button>
@@ -62,6 +65,28 @@
       </section>
 
       <section class="panel-section">
+        <div class="section-heading"><h2>Navigate</h2><span id="cursor-label" class="pill">cursor</span></div>
+        <div class="field-grid two">
+          <label>Coordinate units<select id="coord-unit"><option value="1">mm</option><option value="10">cm</option><option value="1000" selected>m</option><option value="1000000">km</option></select></label>
+          <label>Current snap<input id="nav-snap-display" type="text" readonly></label>
+        </div>
+        <div class="coords nav-coords">
+          <label>X<input id="nav-x" type="number" inputmode="decimal" step="any"></label>
+          <label>Y<input id="nav-y" type="number" inputmode="decimal" step="any"></label>
+          <label>Z<input id="nav-z" type="number" inputmode="decimal" step="any"></label>
+        </div>
+        <div class="nav-actions">
+          <button id="go-to-point" class="accent">Go + focus</button>
+          <button id="plane-to-cursor" class="ghost">Plane to cursor</button>
+        </div>
+        <div class="nav-actions">
+          <button id="rectangle-start" class="ghost">Set rectangle start</button>
+          <button id="rectangle-create" class="ghost" disabled>Create to cursor</button>
+        </div>
+        <p id="rectangle-note" class="hint">The edit grid stays centered on this cursor. Rectangle uses the current working plane, fill type, thickness, color, and snap.</p>
+      </section>
+
+      <section class="panel-section">
         <h2>Working plane</h2>
         <div class="segmented" id="plane-segment">
           <button data-plane="XY" class="active">Top · XY</button>
@@ -81,7 +106,7 @@
           <label>Fill creates<select id="fill-kind"><option value="surface">Surface patch</option><option value="solid">One-snap solid</option></select></label>
           <label>Surface thickness<input id="surface-thickness" type="number" min="1" step="1" inputmode="numeric" value="1"><span class="unit">mm</span></label>
         </div>
-        <p class="hint">A 500 m facade is stored as one patch, not millions of cells.</p>
+        <p class="hint">A 500 m facade is stored as one patch, not millions of cells. Rectangle creation can also use exact cursor coordinates above.</p>
       </section>
 
       <section class="panel-section">

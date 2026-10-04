@@ -1,2 +1,13 @@
-BLOCK/64 Sparse Studio v0.1
-Built 2026-10-03
+BLOCK/64 Sparse Studio v0.2
+2026-10-03
+
+Changes from v0.1:
+- explicit world cage and world extent readout
+- deterministic 16x16 cursor-centered edit grid with visible physical span
+- selection size readout
+- exact XYZ navigation in mm/cm/m/km
+- move working plane to cursor
+- coordinate-driven rectangle creation using cursor start/end
+- scale-aware erase: subtract the current edit cell from large primitives instead of deleting the whole primitive
+- sparse AABB subtraction; one cut creates at most six boxes per affected primitive
+- project format v2 adds a persistent edit cursor and automatically migrates v1 saves

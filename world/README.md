@@ -50,3 +50,14 @@ node --check app.js
 node --check model.mjs
 node --check store.mjs
 ```
+
+## v0.2 interaction changes
+
+- **World boundary:** the full root cube is shown as a stronger world cage, with center axes. The HUD always shows the negative and positive world limits.
+- **Deterministic edit grid:** the working grid is a cursor-centered window of at most 16 × 16 current-snap cells. The HUD states the cell size and total physical span, so changing scale is explicit rather than visually ambiguous.
+- **Persistent cursor:** navigate to exact X/Y/Z coordinates using mm, cm, m, or km. `Go + focus` recenters the local edit view. `Plane to cursor` moves the current XY/XZ/YZ plane through that point.
+- **Coordinate rectangles:** set a rectangle start at the cursor, move the cursor to the opposite point, then create. This uses the current plane, fill type, thickness, snap, and color and remains one sparse primitive.
+- **Local erase:** Erase now subtracts one cell at the current edit scale from existing geometry. A 1 cm erase on a 2 m block removes only that 1 cm region. Subtraction uses sparse rectangular pieces rather than exploding the entire block into tiny cells.
+- **Selection scale:** the viewport HUD shows the exact dimensions of the selected primitive.
+
+Older v0.1 JSON projects load automatically; their edit cursor starts at the world origin.

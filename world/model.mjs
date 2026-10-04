@@ -1,4 +1,4 @@
-export const VERSION = 1;
+export const VERSION = 2;
 export const MM = 1;
 export const M = 1000;
 
@@ -58,6 +58,43 @@ export function makeBox(x, y, z, sx, sy, sz, color = 0, kind = 'solid') {
     id: makeId('b'), type: 'box', kind,
     x: i(x), y: i(y), z: i(z), sx: pos(sx), sy: pos(sy), sz: pos(sz), color: colorIndex(color)
   };
+}
+
+export function primitiveDimensions(p) {
+  if (p.type === 'cell') return [p.size,p.size,p.size];
+  return [p.sx,p.sy,p.sz];
+}
+
+export function primitiveVolume(p) {
+  const [sx,sy,sz]=primitiveDimensions(p);
+  return sx*sy*sz;
+}
+
+export function subtractPrimitive(p, cutBounds) {
+  const source=primitiveAabb(p);
+  const cut={
+    min:[0,1,2].map(k=>Math.max(source.min[k],Math.round(cutBounds.min[k]))),
+    max:[0,1,2].map(k=>Math.min(source.max[k],Math.round(cutBounds.max[k])))
+  };
+  if (cut.min.some((v,k)=>v>=cut.max[k])) return [p];
+  if (cut.min.every((v,k)=>v<=source.min[k]) && cut.max.every((v,k)=>v>=source.max[k])) return [];
+
+  const out=[];
+  const color=p.color, kind=p.type==='box'?p.kind:'solid';
+  const add=(x0,y0,z0,x1,y1,z1)=>{
+    if(x1>x0&&y1>y0&&z1>z0) out.push(makeBox(x0,y0,z0,x1-x0,y1-y0,z1-z0,color,kind));
+  };
+  // Six non-overlapping slabs around the intersection. This keeps subtraction sparse:
+  // one small cut turns one large box into at most six boxes, never millions of cells.
+  add(source.min[0],source.min[1],source.min[2],cut.min[0],source.max[1],source.max[2]);
+  add(cut.max[0],source.min[1],source.min[2],source.max[0],source.max[1],source.max[2]);
+  const x0=Math.max(source.min[0],cut.min[0]), x1=Math.min(source.max[0],cut.max[0]);
+  add(x0,source.min[1],source.min[2],x1,cut.min[1],source.max[2]);
+  add(x0,cut.max[1],source.min[2],x1,source.max[1],source.max[2]);
+  const y0=Math.max(source.min[1],cut.min[1]), y1=Math.min(source.max[1],cut.max[1]);
+  add(x0,y0,source.min[2],x1,y1,cut.min[2]);
+  add(x0,y0,cut.max[2],x1,y1,source.max[2]);
+  return out;
 }
 
 export function primitiveAabb(p) {
@@ -138,6 +175,7 @@ export function makeProject(name='Untitled sparse world') {
     surfaceThicknessMm: 1,
     fillKind: 'surface',
     selectedColor: 37,
+    cursorMm: [0,0,0],
     primitives: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -154,6 +192,7 @@ export function normalizeProject(raw) {
   p.surfaceThicknessMm = pos(p.surfaceThicknessMm || 1);
   p.fillKind = p.fillKind === 'solid' ? 'solid' : 'surface';
   p.selectedColor = colorIndex(p.selectedColor);
+  p.cursorMm = Array.isArray(p.cursorMm) && p.cursorMm.length===3 ? p.cursorMm.map(i) : [0,0,0];
   p.primitives = Array.isArray(p.primitives) ? p.primitives.map(normalizePrimitive).filter(Boolean) : [];
   return p;
 }
